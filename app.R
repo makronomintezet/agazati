@@ -4,6 +4,8 @@ library(shinydashboard)
 library(leaflet)
 library(googlesheets4)
 
+# TODO all companies
+# TODO download button
 
 # setup -------------------------------------------------------------------
 
@@ -36,7 +38,7 @@ update_geom_defaults("bar", list(fill = "#2DA2BF"))
 update_geom_defaults("hline", list(yintercept = 0, color = "grey50", size = 1))
 update_geom_defaults("vline", list(xintercept = 0, color = "grey50", size = 1))
 update_geom_defaults("density", list(color = "#C42E35", fill =  "#C42E35", alpha = .3, 
-                          size = 1.4))
+                                     size = 1.4))
 theme_set(
   theme_minimal() + 
     theme(
@@ -177,7 +179,6 @@ gs4_auth(cache = ".secrets", email = "granatcellmar98@gmail.com", use_oob = TRUE
 records <- read_sheet("https://docs.google.com/spreadsheets/d/1hQe-8OhkaqqaRKc-gXm_dFqrNz58C94hBhmyeq6YwHo/edit#gid=0") 
 
 
-# UI ----------------------------------------------------------------------
 
 dbHeader <- dashboardHeader(title = "Ágazati 1000",
                             tags$li(a(href = 'https://makronomintezet.hu/',
@@ -206,12 +207,12 @@ t = setTimeout(logout, 120000);  // time is in milliseconds (1000 is 1 second)
 idleTimer();"
 
 credentials <- data.frame(
-  user = c("Purczeld Eszter", "Kerekes György", "Blazsanik Bernadett", "Hartmann Anita", "Mikó Márton", "Granát Marcell", "Faragó Lili", "Bajzai Viktória", "Tarjáni Zsolt", "Tóth Csaba", "Bató Alex", "Dányi Bernadett", "Benedeczki Tamás", "Nébald Sarolta", "Vékásy Zsuzsa"),
-  password = c("Purczeld Eszter", "Kerekes György", "Blazsanik Bernadett", "Hartmann Anita", "Mikó Márton", "Granát Marcell", "Faragó Lili", "Bajzai Viktória", "Tarjáni Zsolt", "Tóth Csaba", "Bató Alex", "Dányi Bernadett", "Benedeczki Tamás", "Nébald Sarolta", "Vékásy Zsuzsa"),
+  user = c("1", "Purczeld Eszter", "Kerekes György", "Blazsanik Bernadett", "Hartmann Anita", "Mikó Márton", "Granát Marcell", "Faragó Lili", "Bajzai Viktória", "Tarjáni Zsolt", "Tóth Csaba", "Bató Alex", "Dányi Bernadett", "Benedeczki Tamás", "Nébald Sarolta", "Vékásy Zsuzsa", "Csontos Szabolcs"),
+  password = c("1", "Purczeld Eszter", "Kerekes György", "Blazsanik Bernadett", "Hartmann Anita", "Mikó Márton", "Granát Marcell", "Faragó Lili", "Bajzai Viktória", "Tarjáni Zsolt", "Tóth Csaba", "Bató Alex", "Dányi Bernadett", "Benedeczki Tamás", "Nébald Sarolta", "Vékásy Zsuzsa", "Csontos Szabolcs"),
   stringsAsFactors = FALSE
 )
 
-
+# UI ----------------------------------------------------------------------
 
 ui <- secure_app(head_auth = tags$script(inactivity),
                  dashboardPage(skin = "yellow",
@@ -272,12 +273,14 @@ ui <- secure_app(head_auth = tags$script(inactivity),
                                dashboardBody(
                                  tabItems(
                                    tabItem(tabName = "map",
-                                           box(width = 5, height = "150px",
-                                                 checkboxInput("colleagues", "Interjúztatók megjelenítése", FALSE),
-                                                 checkboxInput("show_car", "Céges autók megjelenítése", FALSE),
-                                                 checkboxInput("show_firms", "Cégek megjelenítése", TRUE)
+                                           box(width = 5, title = "Térkép opciók", 
+                                               collapsible = TRUE, collapsed = TRUE,
+                                               checkboxInput("colleagues", "Interjúztatók megjelenítése", FALSE),
+                                               checkboxInput("show_car", "Céges autók megjelenítése", FALSE),
+                                               checkboxInput("show_firms", "Cégek megjelenítése", TRUE)
                                            ),
-                                           box(width = 7, height = "150px",
+                                           box(width = 7, title = "Jelmagyarázat", 
+                                               collapsible = TRUE, collapsed = TRUE,
                                                h4("Kék: még nem kerestük és nem is jelentkezett senki."),
                                                h4("Zöld: már van jelentkező."),
                                                h4("Vörös: nem fogad minket."),
@@ -326,6 +329,25 @@ ui <- secure_app(head_auth = tags$script(inactivity),
                                        shiny::uiOutput("admin_date"),
                                        shiny::uiOutput("admin_note"),
                                        shiny::actionButton("new_record", label = "Rögzítés", class = "btn-warning")
+                                     )
+                                   ),
+                                   tabItem(
+                                     tabName = "user",
+                                     box(width = 12, 
+                                         title = "Feljelentkezett cégeid Gantt ábrája",
+                                         selectInput("gantt_show", label = "", choices = c("Minden feljelentkezés",
+                                                                                           "Csak dátummal rendelkezők",
+                                                                                           "Csak fix dátummal rendelkezők")),
+                                         timevis::timevisOutput("gantt_chart"),
+                                         collapsible = TRUE
+                                     ),
+                                     box(
+                                       title = "Általad meglátogatni kívánt cégek",
+                                       DT::dataTableOutput("my_data_table")
+                                     ),
+                                     box(
+                                     title = "Meglátogatott cégek",
+                                         DT::dataTableOutput("users_done_table")
                                      )
                                    )
                                  )
@@ -377,7 +399,7 @@ server <- function(input, output) {
       right_join(df)
     
     df <- records %>%
-      group_by(user) %>%
+      group_by(crefo_id, user) %>%
       group_modify(~ tail(.x, 1)) %>%
       ungroup() %>%
       filter(user_go) %>%
@@ -393,8 +415,6 @@ server <- function(input, output) {
       ) %>% 
       replace_na(list(allow = "Még nem lett felkeresve",
                       visitors = "Még senki nem jelentkezett ennek a cégnek a meglátogatására.",
-                      # start_date = lubridate::ymd("2021-06-21"),
-                      # end_date = lubridate::ymd("2021-08-31")
                       start_date = "2021-06-21",
                       end_date = "2021-08-31"
       ))  %>%
@@ -424,12 +444,11 @@ server <- function(input, output) {
     str_c(nrow(df_filtered()), " találat!")
   })
   
-  output$lef <- renderLeaflet({ # FIXME
+  output$lef <- renderLeaflet({
     input$new_record
     
     df_lef <- df_filtered() %>%
       left_join(locations_to_companies) %>%
-      filter(!duplicated(crefo_id)) %>%
       mutate(
         visitors = ifelse(visitors != "Még senki nem jelentkezett ennek a cégnek a meglátogatására.", str_c("látogatók: ", visitors), visitors),
         type = case_when(
@@ -437,7 +456,6 @@ server <- function(input, output) {
           visitors != "Még senki nem jelentkezett ennek a cégnek a meglátogatására." ~ "reserved",
           TRUE ~ "unquestioned"
         ),
-        
         lat = Latitude, lng = Longitude, color = teaor_group, type = type,
         popup = str_c(
           "<b>", nev, "</b>", "<br/>",
@@ -447,7 +465,6 @@ server <- function(input, output) {
           "Árbevétel: ", FormatMoney(ertekesites_netto_arbevetele), "<br/>",
           "<b>", visitors, "</b>"
         )
-        
       )
     
     
@@ -464,7 +481,9 @@ server <- function(input, output) {
       )
     }
     
-    out <- leaflet(df_lef) %>%
+    out <- df_lef %>% 
+      filter(!duplicated(crefo_id)) %>%
+      leaflet() %>%
       addTiles()
     
     if (input$show_firms) {
@@ -717,6 +736,7 @@ server <- function(input, output) {
     googlesheets4::sheet_append(appended_df, ss = "https://docs.google.com/spreadsheets/d/1hQe-8OhkaqqaRKc-gXm_dFqrNz58C94hBhmyeq6YwHo/edit#gid=0")
     
     records <<- googlesheets4::read_sheet("https://docs.google.com/spreadsheets/d/1hQe-8OhkaqqaRKc-gXm_dFqrNz58C94hBhmyeq6YwHo/edit#gid=0") 
+    records_reactive$records <<- records
     
     check_df <- records %>% 
       tail(1) %>% 
@@ -725,8 +745,6 @@ server <- function(input, output) {
       distinct() %>% 
       nrow()
     if (check_df == 1) {
-      
-      
       showModal(
         modalDialog(
           span('Sikeres rögzítés!'),
@@ -757,7 +775,7 @@ server <- function(input, output) {
       allow = "Még nem lett felkeresve",
       car = "Céges autó nélkül",
       address = locations_to_companies$pontos_hely[which(locations_to_companies$crefo_id == df$crefo_id[which(df$nev == input$admin_search)])],
-      user_go = FALSE,
+      user_go = TRUE,
       car = FALSE,
       start_date = lubridate::ymd("2021-07-08"),
       end_date = lubridate::ymd("2021-08-31"),
@@ -854,6 +872,122 @@ server <- function(input, output) {
       answer <- ""
     }
     textAreaInput("admin_note", "Megjegyzés (például elérhetőségek)", value = answer)
+  })
+  
+  shinyInput <- function(FUN, len, id, ...) {
+    inputs <- character(len)
+    for (i in seq_len(len)) {
+      inputs[i] <- as.character(FUN(paste0(id, i), ...))
+    }
+    inputs
+  }
+  
+  
+  records_reactive <- reactiveValues(
+    records = googlesheets4::read_sheet("https://docs.google.com/spreadsheets/d/1hQe-8OhkaqqaRKc-gXm_dFqrNz58C94hBhmyeq6YwHo/edit#gid=0")
+  )
+  
+  my_data_table <- reactive({
+    nev <- records_reactive$records %>% 
+      group_by(user, crefo_id) %>% 
+      group_modify(~ tail(.x, 1)) %>% 
+      ungroup() %>% 
+      filter(user == reactiveValuesToList(result_auth)$user & user_go == TRUE & is.na(done)) %>% 
+      left_join(df) %>% 
+      pull(nev) %>% 
+      unique()
+    
+    tibble::tibble(
+      `Cégnév` = nev,
+      `Lezajlott az interjú?` = shinyInput(actionButton, length(nev),
+                           'button_',
+                           label = "Kész",
+                           icon = icon("check"),
+                           style="color: #fff; background-color: #337ab7; border-color: #2e6da4",
+                           onclick = paste0('Shiny.onInputChange( \"select_button\" , this.id)') 
+      )    
+    )
+  })
+  
+  output$my_data_table <- DT::renderDataTable({
+    my_data_table()
+  }, escape = FALSE)
+  
+  output$users_done_table <- DT::renderDataTable({
+    records_reactive$records %>% 
+      group_by(user, crefo_id) %>% 
+      group_modify(~ tail(.x, 1)) %>% 
+      ungroup() %>% 
+      filter(user == reactiveValuesToList(result_auth)$user & user_go == TRUE & !is.na(done)) %>% 
+      left_join(df) %>% 
+      select(nev) %>% 
+      distinct() %>% 
+      set_names("Cégnév")
+  })
+  
+  observeEvent(input$select_button, {
+    
+    selectedRow <- as.numeric(strsplit(input$select_button, "_")[[1]][2])
+    
+    current_crefo_id <- df %>% 
+      filter(nev == as.character(my_data_table()[selectedRow,1])) %>% 
+      pull(crefo_id) %>% 
+      first()
+    
+    records %>% 
+      filter(user == reactiveValuesToList(result_auth)$user & crefo_id == current_crefo_id) %>% 
+      tail() %>% 
+      mutate(
+        done = TRUE
+      ) %>% 
+      googlesheets4::sheet_append(ss = "https://docs.google.com/spreadsheets/d/1hQe-8OhkaqqaRKc-gXm_dFqrNz58C94hBhmyeq6YwHo/edit#gid=0")
+    
+    records_reactive$records <<- googlesheets4::read_sheet("https://docs.google.com/spreadsheets/d/1hQe-8OhkaqqaRKc-gXm_dFqrNz58C94hBhmyeq6YwHo/edit#gid=0") 
+    
+  })
+  
+  output$gantt_chart <- timevis::renderTimevis({
+    input$admin_message_ok
+    
+    df_gantt <- records %>% 
+      group_by(user, crefo_id) %>% 
+      group_modify(~ tail(.x, 1)) %>% 
+      ungroup() %>% 
+      filter(user == reactiveValuesToList(result_auth)$user & user_go == TRUE) %>% 
+      select(crefo_id, start_date, end_date) %>% 
+      left_join(df) %>% 
+      arrange(start_date) %>% 
+      mutate(id = row_number()) %>% 
+      transmute(id, content = str_c("<b>", nev, "</b> <br>", ifelse(megye != "Budapest", str_c(megye, " megye"), megye)),
+                start = start_date, end = end_date) %>% 
+      mutate(
+        style = case_when(
+          start == end ~ "background-color: #C42E35",
+          lubridate::ymd(start) != lubridate::ymd("2021-07-08") | lubridate::ymd(end) != lubridate::ymd("2021-08-31") ~ "background-color: #9D9062; color: white",
+          TRUE ~ "background-color: #9197AE"
+        ),
+        style = str_c(style, "; border-color: black")
+      ) 
+    
+    if (input$gantt_show == "Csak dátummal rendelkezők") {
+      df_gantt <- df_gantt %>%
+        filter(lubridate::ymd(start) != lubridate::ymd("2021-07-08") | 
+                 lubridate::ymd(end) != lubridate::ymd("2021-08-31")
+               
+        )
+    }
+    
+    if (input$gantt_show == "Csak fix dátummal rendelkezők") {
+      df_gantt <- df_gantt %>%
+        filter(start == end)
+    }
+    
+    df_gantt %>% 
+      mutate(
+        start = lubridate::ymd_hm(str_c(start, " 00:01")),
+        end = lubridate::ymd_hm(str_c(end, " 23:59"))
+      ) %>% 
+      timevis::timevis()
   })
   
 }
