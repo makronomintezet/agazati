@@ -4,28 +4,15 @@ library(shinydashboard)
 library(leaflet)
 library(googlesheets4)
 
-# TODO all companies
-# TODO download button
-
 # setup -------------------------------------------------------------------
+
+# TODO CAR MENU
+# TODO INTERVAL IF CAR NEEDED
 
 library(tidyverse)
 library(plotly)
 
 options(scipen = 999)
-
-gRate <- function(df, x, y) {
-  # growth rate of ertekesites_netto_arbevetele
-  # calculation base don logdiff >> ensure robust results
-  formula <- str_c("log(", y, ") ~ ", x)
-  lm(formula = eval(formula), data = df) %>% 
-    coef() %>% 
-    .[2]*100
-}
-
-gRate <- possibly(gRate, as.numeric(NA), TRUE)
-
-
 
 update_geom_defaults("point", list(fill = "#C42E35", 
                                    shape = 21, 
@@ -160,7 +147,6 @@ NiceFormat <- function(x, y) {
   )
 }
 
-
 source("df_utf8.R", echo = FALSE, encoding = 'UTF-8')
 
 locations_to_companies <- readxl::read_excel("locations_to_companies.xlsx") %>% 
@@ -207,8 +193,8 @@ t = setTimeout(logout, 120000);  // time is in milliseconds (1000 is 1 second)
 idleTimer();"
 
 credentials <- data.frame(
-  user = c("1", "Purczeld Eszter", "Kerekes György", "Blazsanik Bernadett", "Hartmann Anita", "Mikó Márton", "Granát Marcell", "Faragó Lili", "Bajzai Viktória", "Tarjáni Zsolt", "Tóth Csaba", "Bató Alex", "Dányi Bernadett", "Benedeczki Tamás", "Nébald Sarolta", "Vékásy Zsuzsa", "Csontos Szabolcs"),
-  password = c("1", "Purczeld Eszter", "Kerekes György", "Blazsanik Bernadett", "Hartmann Anita", "Mikó Márton", "Granát Marcell", "Faragó Lili", "Bajzai Viktória", "Tarjáni Zsolt", "Tóth Csaba", "Bató Alex", "Dányi Bernadett", "Benedeczki Tamás", "Nébald Sarolta", "Vékásy Zsuzsa", "Csontos Szabolcs"),
+  user = c("Purczeld Eszter", "Kerekes György", "Blazsanik Bernadett", "Hartmann Anita", "Mikó Márton", "Granát Marcell", "Faragó Lili", "Bajzai Viktória", "Tarjáni Zsolt", "Tóth Csaba", "Bató Alex", "Dányi Bernadett", "Benedeczki Tamás", "Nébald Sarolta", "Vékásy Zsuzsa", "Csontos Szabolcs", "Sturcz Viktória", "Meleg Attila"),
+  password = c("Purczeld Eszter", "Kerekes György", "Blazsanik Bernadett", "Hartmann Anita", "Mikó Márton", "Granát Marcell", "Faragó Lili", "Bajzai Viktória", "Tarjáni Zsolt", "Tóth Csaba", "Bató Alex", "Dányi Bernadett", "Benedeczki Tamás", "Nébald Sarolta", "Vékásy Zsuzsa", "Csontos Szabolcs", "Sturcz Viktória", "Meleg Attila"),
   stringsAsFactors = FALSE
 )
 
@@ -266,7 +252,8 @@ ui <- secure_app(head_auth = tags$script(inactivity),
                                    menuItem("Táblázat", tabName  = "table", icon = icon("th")),
                                    menuItem("Céginfo", tabName  = "info", icon = icon("building")),
                                    menuItem("Adminisztráció", tabName = "admin", icon = icon("book")),
-                                   menuItem("Az én cégeim", tabName = "user", icon = icon("user"))
+                                   menuItem("Az én cégeim", tabName = "user", icon = icon("user")),
+                                   menuItem("Autó nyilvántartás", tabName = "car", icon = icon("car"))
                                  )
                                ),
                                
@@ -304,10 +291,9 @@ ui <- secure_app(head_auth = tags$script(inactivity),
                                            multiple = FALSE, # allow for multiple inputs
                                            options = list(create = FALSE) # if TRUE, allows newly created inputs
                                          ),
-                                         tableOutput("company_summary")
+                                         tableOutput("company_summary"),
                                          # FIXME
-                                         #,
-                                         # uiOutput("downloadbutton")
+                                         uiOutput("downloadbutton")
                                      )
                                    ),
                                    tabItem(
@@ -327,6 +313,7 @@ ui <- secure_app(head_auth = tags$script(inactivity),
                                        shiny::uiOutput("admin_car"),
                                        shiny::uiOutput("admin_address"),
                                        shiny::uiOutput("admin_date"),
+                                       shiny::uiOutput("admin_car_interval"),
                                        shiny::uiOutput("admin_note"),
                                        shiny::actionButton("new_record", label = "Rögzítés", class = "btn-warning")
                                      )
@@ -346,8 +333,28 @@ ui <- secure_app(head_auth = tags$script(inactivity),
                                        DT::dataTableOutput("my_data_table")
                                      ),
                                      box(
-                                     title = "Meglátogatott cégek",
-                                         DT::dataTableOutput("users_done_table")
+                                       title = "Meglátogatott cégek",
+                                       DT::dataTableOutput("users_done_table")
+                                     )
+                                   ),
+                                   tabItem(
+                                     tabName = "car",
+                                     box(title = "Céges autó használatára leadott igények", width = 12, collapsible = TRUE, collapsed = FALSE,
+                                         selectInput("car_gantt_filter", label = "", 
+                                                     choices = c("Minden feljelentkezés",
+                                                                 "Csak dátummal rendelkezők",
+                                                                 "Csak fix dátummal rendelkezők"),
+                                                     selected = "Csak fix dátummal rendelkezők"
+                                         ),
+                                         timevis::timevisOutput("car_gantt_chart")
+                                     ),
+                                     box(
+                                       title = "Ez a hét", width = 6, collapsible = TRUE, collapsed = FALSE,
+                                       shiny::plotOutput("this_week_plot")
+                                     ),
+                                     box(
+                                       title = "Céges autó igények (csak dátummal rendelkezők)", width = 6, collapsible = TRUE, collapsed = FALSE,
+                                       DT::dataTableOutput("car_table")
                                      )
                                    )
                                  )
@@ -437,6 +444,11 @@ server <- function(input, output) {
     }
     
     df %>% 
+      mutate(
+        teaor_group = as.character(teaor_group),
+        teaor_name = as.character(teaor_name)
+      ) %>% 
+      replace_na(list(teaor_group = "Nincs ágazati besorolás", teaor_name = "Nincs szakági besorolás")) %>% 
       filter(allow != "A cég már megszűnt")
   })
   
@@ -706,7 +718,12 @@ server <- function(input, output) {
     content = function(file) {
       tempReport <- file.path(tempdir(), "report.Rmd")
       file.copy("report.Rmd", tempReport, overwrite = TRUE)
-      params <- list(nev = input$search)
+      params <- list(
+        nev = input$search,
+        df = df,
+        locations_to_companies = locations_to_companies,
+        df_all_year = readRDS("SelectedCompanies_all_year.rds")
+      )
       rmarkdown::render(tempReport, output_file = file,
                         params = params,
                         envir = new.env(parent = globalenv())
@@ -720,6 +737,21 @@ server <- function(input, output) {
   
   observeEvent(eventExpr = input$new_record, handlerExpr = {
     
+    car_needed <- input$admin_date[1] == input$admin_date[2] & input$admin_car != "Saját autóval" & input$admin_car != "Autó nélkül"
+    
+    car_id_permission_denied <- input$admin_car %in% c("SST-865", "SST-866", "SST-908") & 
+      reactiveValuesToList(result_auth)$user != "Blazsanik Bernadett" &
+      reactiveValuesToList(result_auth)$user != "Bajzai Viktória" &
+      reactiveValuesToList(result_auth)$user != "Tarjáni Zsolt" &
+      reactiveValuesToList(result_auth)$user != "Mikó Márton"
+    
+    previously_administrated_car <- records %>% 
+      filter(crefo_id == df$crefo_id[which(df$nev == input$admin_search)]) %>% 
+      pull(car) %>% 
+      {input$admin_car %in% .}
+    
+    car_id_permission_denied <- !previously_administrated_car & car_id_permission_denied
+    
     appended_df <- data.frame(
       crefo_id = df$crefo_id[which(df$nev == input$admin_search)],
       system_time = Sys.time(),
@@ -730,35 +762,49 @@ server <- function(input, output) {
       car = input$admin_car,
       start_date = input$admin_date[1],
       end_date = input$admin_date[2],
-      note = input$admin_note
+      note = input$admin_note,
+      done = "",
+      time_start = ifelse(car_needed, input$admin_car_interval[1], ""),
+      time_end = ifelse(car_needed, input$admin_car_interval[2], "")
     )
     
-    googlesheets4::sheet_append(appended_df, ss = "https://docs.google.com/spreadsheets/d/1hQe-8OhkaqqaRKc-gXm_dFqrNz58C94hBhmyeq6YwHo/edit#gid=0")
-    
-    records <<- googlesheets4::read_sheet("https://docs.google.com/spreadsheets/d/1hQe-8OhkaqqaRKc-gXm_dFqrNz58C94hBhmyeq6YwHo/edit#gid=0") 
-    records_reactive$records <<- records
-    
-    check_df <- records %>% 
-      tail(1) %>% 
-      bind_rows(appended_df) %>% 
-      select(user, allow, address, user_go, car) %>% 
-      distinct() %>% 
-      nrow()
-    if (check_df == 1) {
+    if (car_id_permission_denied) {
       showModal(
         modalDialog(
-          span('Sikeres rögzítés!'),
-          footer = tagList(actionButton("admin_message_ok", "OK")
-          )
-        )
-      )
-    } else {
-      showModal(
-        modalDialog(
-          span('Hiba történt'),
+          span('Céges autóra való igényed a céges autó opció választásával jelezd!
+               Az autók adminisztrálására az alábbi személyek jogosultak: Bajzai Viktória, Blazsanik Bernadett, Mikó Márton, Tarjáni Zsolt.'),
           easyClose = TRUE
         )
       )
+    } else {
+      
+      googlesheets4::sheet_append(appended_df, ss = "https://docs.google.com/spreadsheets/d/1hQe-8OhkaqqaRKc-gXm_dFqrNz58C94hBhmyeq6YwHo/edit#gid=0")
+      
+      records <<- googlesheets4::read_sheet("https://docs.google.com/spreadsheets/d/1hQe-8OhkaqqaRKc-gXm_dFqrNz58C94hBhmyeq6YwHo/edit#gid=0") 
+      records_reactive$records <<- records
+      
+      check_df <- records %>% 
+        tail(1) %>% 
+        bind_rows(appended_df) %>% 
+        select(user, allow, address, user_go, car) %>% 
+        distinct() %>% 
+        nrow()
+      if (check_df == 1) {
+        showModal(
+          modalDialog(
+            span('Sikeres rögzítés!'),
+            footer = tagList(actionButton("admin_message_ok", "OK")
+            )
+          )
+        )
+      } else {
+        showModal(
+          modalDialog(
+            span('Hiba történt'),
+            easyClose = TRUE
+          )
+        )
+      }
     }
   })
   
@@ -768,6 +814,8 @@ server <- function(input, output) {
   
   company_records <- reactive({
     input$admin_search
+    
+    
     null_df <- data.frame(
       crefo_id = df$crefo_id[which(df$nev == input$admin_search)],
       system_time = NA,
@@ -775,11 +823,13 @@ server <- function(input, output) {
       allow = "Még nem lett felkeresve",
       car = "Céges autó nélkül",
       address = locations_to_companies$pontos_hely[which(locations_to_companies$crefo_id == df$crefo_id[which(df$nev == input$admin_search)])],
-      user_go = TRUE,
+      user_go = ifelse(reactiveValuesToList(result_auth)$user %in% c("Bajzai Viktória", "Blazsanik Bernadett"), FALSE, TRUE),
       car = FALSE,
       start_date = lubridate::ymd("2021-07-08"),
       end_date = lubridate::ymd("2021-08-31"),
-      note = ""
+      note = "",
+      time_start = "10:00",
+      time_end = "14:00"
     )
     
     add_df <- filter(records, crefo_id == df$crefo_id[which(df$nev == input$admin_search)])
@@ -827,7 +877,7 @@ server <- function(input, output) {
     answer <- company_records() %>%
       pull(car) %>%
       last()
-    shiny::selectInput("admin_car", "Céges autó rendszáma", 
+    shiny::selectInput("admin_car", "Utazás:", 
                        c("Saját autóval", "Van igény céges autóra", 
                          "Autó nélkül", "SST-865", "SST-908", "SST-866"),
                        selected = answer
@@ -882,6 +932,25 @@ server <- function(input, output) {
     inputs
   }
   
+  output$admin_car_interval <- renderUI({
+    
+    answer1 <- company_records() %>% 
+      pull(time_start) %>% 
+      last()
+    
+    answer2 <- company_records() %>% 
+      pull(time_end) %>% 
+      last()
+    
+    if (input$admin_date[1] == input$admin_date[2] & input$admin_car != "Saját autóval" & input$admin_car != "Autó nélkül") {
+      shinyWidgets::sliderTextInput("admin_car_interval", label = "Céges autó foglalásának ideje", choices =
+                                      str_c("_", rep(0:23, each = 4),":", rep(0:3*15, 24), "_") %>%
+                                      str_replace_all("_0:", "00:") %>%
+                                      str_replace_all(":0_", ":00") %>%
+                                      str_remove_all("_"), selected = c(answer1, answer2)
+      )
+    }
+  })
   
   records_reactive <- reactiveValues(
     records = googlesheets4::read_sheet("https://docs.google.com/spreadsheets/d/1hQe-8OhkaqqaRKc-gXm_dFqrNz58C94hBhmyeq6YwHo/edit#gid=0")
@@ -900,11 +969,11 @@ server <- function(input, output) {
     tibble::tibble(
       `Cégnév` = nev,
       `Lezajlott az interjú?` = shinyInput(actionButton, length(nev),
-                           'button_',
-                           label = "Kész",
-                           icon = icon("check"),
-                           style="color: #fff; background-color: #337ab7; border-color: #2e6da4",
-                           onclick = paste0('Shiny.onInputChange( \"select_button\" , this.id)') 
+                                           'button_',
+                                           label = "Kész",
+                                           icon = icon("check"),
+                                           style="color: #fff; background-color: #337ab7; border-color: #2e6da4",
+                                           onclick = paste0('Shiny.onInputChange( \"select_button\" , this.id)') 
       )    
     )
   })
@@ -956,6 +1025,9 @@ server <- function(input, output) {
       filter(user == reactiveValuesToList(result_auth)$user & user_go == TRUE) %>% 
       select(crefo_id, start_date, end_date) %>% 
       left_join(df) %>% 
+      group_by(crefo_id) %>% 
+      group_modify(~ tail(.x, 1)) %>% 
+      ungroup() %>% 
       arrange(start_date) %>% 
       mutate(id = row_number()) %>% 
       transmute(id, content = str_c("<b>", nev, "</b> <br>", ifelse(megye != "Budapest", str_c(megye, " megye"), megye)),
@@ -988,6 +1060,147 @@ server <- function(input, output) {
         end = lubridate::ymd_hm(str_c(end, " 23:59"))
       ) %>% 
       timevis::timevis()
+  })
+  
+  output$car_gantt_chart <- timevis::renderTimevis({
+    input$admin_message_ok
+    
+    car_needed_df <- records %>% 
+      group_by(crefo_id) %>% 
+      group_modify(~ tail(.x, 1)) %>% 
+      ungroup() %>% 
+      filter(car != "Saját autóval" & car != "Autó nélkül") %>% 
+      left_join(df) %>% 
+      select(start_date, end_date, car, time_start, time_end, megye, nev, crefo_id)
+    
+    
+    if (input$car_gantt_filter == "Csak dátummal rendelkezők") {
+      car_needed_df <- car_needed_df %>% 
+        filter(lubridate::ymd(start_date) != lubridate::ymd("2021-07-08") | 
+                 lubridate::ymd(end_date) != lubridate::ymd("2021-08-31")
+               
+        )
+    }
+    
+    if (input$car_gantt_filter == "Csak fix dátummal rendelkezők") {
+      car_needed_df <- car_needed_df %>%
+        filter(start_date == end_date)
+    }
+    
+    car_needed_df <- car_needed_df %>% 
+      replace_na(list(
+        time_start = "00:00",
+        time_end = "23:59"
+      )) %>% 
+      mutate(
+        time_start = lubridate::ymd_hm(str_c(start_date, " ", time_start)),
+        time_end = lubridate::ymd_hm(str_c(end_date, " ", time_end))
+      )
+    
+    car_needed_df <- records %>% 
+      group_by(crefo_id, user) %>% 
+      group_modify(~ tail(.x, 1)) %>% 
+      ungroup() %>% 
+      filter(user_go) %>% 
+      group_by(crefo_id) %>% 
+      summarise(visitor = str_c(user, collapse = ", ")) %>% 
+      left_join(car_needed_df)
+    
+    car_needed_df <- car_needed_df %>% 
+      group_by(crefo_id) %>% 
+      group_modify(~ tail(.x, 1)) %>% 
+      ungroup() %>% 
+      mutate(id = row_number()) %>% 
+      transmute(id, content = str_c("<b>", visitor, "</b> (", nev, ") <br>", ifelse(megye != "Budapest", str_c(megye, " megye"), megye), "<br>", car),
+                start = time_start, end = time_end,
+                style = case_when(
+                  car == "SST-865" ~ "background-color: red", # TODO COLORS
+                  car == "SST-866" ~ "background-color: blue",
+                  car == "SST-908" ~ "background-color: orange",
+                  car == "Van igény céges autóra" ~ "background-color: purple"
+                )
+      ) %>% 
+      mutate(
+        style = str_c(style, "; border-color: black")
+      ) %>% 
+      na.omit()
+    
+    timevis::timevis(car_needed_df)
+  })
+  
+  output$this_week_plot <- shiny::renderPlot({
+    
+    this_week_dates <- Sys.Date() - lubridate::wday(Sys.Date(), week_start = 1) %>% 
+      {. - 1:7} #> do not clearly understand why `-`, but works
+    
+    reserves_df <- records %>% 
+      group_by(crefo_id) %>% 
+      group_modify(~ tail(.x, 1)) %>% 
+      ungroup() %>% 
+      filter(car != "Saját autóval" & car != "Autó nélkül") %>% 
+      left_join(df) %>% 
+      group_by(crefo_id) %>% 
+      group_modify(~ tail(.x, 1)) %>% 
+      ungroup() %>% 
+      select(start_date, end_date, car, time_start, time_end, megye, nev, crefo_id) %>% 
+      filter(start_date == end_date) %>% 
+      mutate(
+        label = str_c(time_start, " - ", time_end)
+      ) %>% 
+      group_by(start_date, car) %>% 
+      summarise(label = str_c(label, collapse = "\n")) %>% 
+      replace_na(list(label = "Nincs időpont megadva"))
+    
+    crossing(start_date = this_week_dates, car = c("Van igény céges autóra", "SST-865", "SST-908", "SST-866")) %>%
+      left_join(reserves_df) %>% 
+      mutate(
+        reserved = ifelse(is.na(label), "Nincs még kiadva", "Ki van már adva")
+      ) %>% 
+      ggplot() +
+      aes(start_date, car) +
+      geom_tile(aes(fill = reserved), color = "black", alpha = .5, show.legend = FALSE) + 
+      geom_text(aes(label = label)) +
+      scale_fill_manual(values = c("Ki van már adva" = "red4", "Nincs még kiadva" = "steelblue")) +
+      scale_x_continuous(breaks = this_week_dates, labels = c("H", "K", "Sze", "Cs", "P", "Szo", "V")) +
+      labs(x = "hétfő - vasárnap", y = "Autó foglalás")
+    
+  })
+  
+  output$car_table <- DT::renderDataTable({
+    
+    
+    car_df <- records %>% 
+      group_by(crefo_id) %>% 
+      group_modify(~ tail(.x, 1)) %>% 
+      ungroup() %>% 
+      filter(car != "Saját autóval" & car != "Autó nélkül") %>% 
+      left_join(df) %>% 
+      group_by(crefo_id) %>% 
+      group_modify(~ tail(.x, 1)) %>% 
+      ungroup()
+    
+    car_df <- records %>%
+      group_by(crefo_id, user) %>%
+      group_modify(~ tail(.x, 1)) %>%
+      ungroup() %>%
+      filter(user_go) %>%
+      group_by(crefo_id) %>%
+      summarise(visitors = str_c(user, collapse = ", ")) %>%
+      ungroup() %>% 
+      right_join(car_df)
+    
+    car_df %>% 
+      mutate(
+        date = ifelse(start_date == end_date, as.character(start_date), str_c(start_date, " - ", end_date))
+      ) %>% 
+      arrange(start_date) %>% 
+      filter(lubridate::ymd(end_date) >= Sys.Date() &
+               date != "2021-07-08 - 2021-08-31"
+      ) %>% 
+      select(visitors, nev, date, car) %>% 
+      set_names("Interjúztató", "Cég", "Dátum", "Céges autó") %>% 
+      DT::datatable()
+    
   })
   
 }
